@@ -2,9 +2,10 @@
 version: 1
 
 build_arg_defaults:
-  ANSIBLE_RUNNER_IMAGE: "quay.io/ansible/ansible-runner:stable-2.9-devel"
+  EE_BASE_IMAGE: "quay.io/aap/ansible-automation-platform-20-ee-minimal-rhel8:latest"
+  EE_BUILDER_IMAGE: "quay.io/aap/ansible-automation-platform-20-ansible-builder-rhel8:latest"
 
-ansible_config: "ansible.cfg"
+#ansible_config: "ansible.cfg"
 
 dependencies:
   galaxy: requirements.yml
@@ -14,4 +15,4 @@ additional_build_steps:
   prepend: |
     RUN pip3 install --upgrade pip setuptools
   append:
-    - RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xvzf - -C /usr/local/bin/ oc && chmod 755 /usr/local/bin/oc && ln -s /usr/local/bin/oc /usr/local/bin/kubectl
+    - RUN microdnf install -y tar && microdnf clean all && curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xvzf - -C /usr/local/bin/ oc && chmod 755 /usr/local/bin/oc && ln -s /usr/local/bin/oc /usr/local/bin/kubectl

@@ -10,10 +10,10 @@ spec:
           set -e
           cd /workspace/source/$(build.source.contextDir)
 
-          /usr/local/bin/ansible-builder build -t $(build.output.image) -v 3
+          /usr/bin/ansible-builder build -t $(build.output.image) -v 3
       command:
         - /bin/bash
-      image: "quay.io/ablock/ansible-runner-podman:latest"
+      image: "quay.io/ablock/ansible-runner-podman:aap"
       name: ansible-builder-build
       resources:
         limits:
@@ -34,7 +34,7 @@ spec:
         - "--tls-verify=false"
       command:
         - /usr/bin/podman
-      image: "quay.io/ablock/ansible-runner-podman:latest"
+      image: "quay.io/ablock/ansible-runner-podman:aap"
       name: ansible-builder-push
       resources:
         limits:

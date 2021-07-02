@@ -10,12 +10,13 @@ Shipwright is a framework for building container images within Kubernetes. Ansib
 
 Use the following steps to install Shipwright and the `ClusterBuildStrategy` to your environment
 
-1. Install Tekton/OpenShift Pipelines. In an OpenShift environment, this can be achieved in OperatorHub by installing either OpenShift Pipelines or OpenShift GitOps as it includes OpenShift Pipelines.
+1. Install Tekton/OpenShift Pipelines. In an OpenShift environment, this can be achieved in OperatorHub by installing either OpenShift Pipelines.
 2. Install Shipwright
 
 ```
-kubectl apply -f https://github.com/shipwright-io/build/releases/download/v0.4.0/release.yaml
-kubectl apply -f https://github.com/shipwright-io/build/releases/download/nightly/default_strategies.yaml
+kubectl apply --filename https://github.com/shipwright-io/build/releases/download/v0.5.1/release.yaml
+
+kubectl apply --filename https://github.com/shipwright-io/build/releases/download/nightly/default_strategies.yaml
 ```
 
 Confirm the operator is running in the `build-operator` project
@@ -58,21 +59,45 @@ NAME                                        REGISTERED   REASON                 
 ansible-builder-example                     True         Succeeded                     ClusterBuildStrategy   ansible-builder     4h32m
 ```
 
-3. Grant Access to the `privileged` SCC (OpenShift)
-
-Elevated permissions through the use of a privileged container is needed during the build process and when running on OpenShift, access to the `privileged` Security Context Constraint is required. Grant the `pipelines` service account access to the SCC by executing the following command:
+3. Create a _ServiceAccount_ called `ansible-builder-shipwright` that will be used to execute the build.
 
 ```
-oc adm policy add-scc-to-user privileged -n ansible-builder-shipwright -z pipeline
+kubectl apply -f resources/serviceaccount.yml
 ```
 
-3. Start a new Build by creating a `BuildRun`
+4. Create a _Secret_ called `ansible-ee-images` containing credentials to access the Ansible Automation Platform images from the authenticated registry by replacing your _username_ and _password_ and executing the following command:
+
+```
+kubectl create secret docker-registry ansible-ee-images --docker-username=<username> --docker-password=<password> --docker-server=quay.io
+```
+
+5. Patch the `ansible-builder-shipwright` _ServiceAccount_ with the `ansible-ee-images` _Secret_ so that the build will be able to access the protected images
+
+```
+kubectl patch serviceaccount ansible-builder-shipwright  -p '{"secrets": [{"name": "ansible-ee-images"}]}'
+```
+
+6. Grant Access to the `privileged` SCC (OpenShift) to the `ansible-builder-shipwright` _ServiceAccount_
+
+Elevated permissions through the use of a privileged container is needed during the build process and when running on OpenShift, access to the `privileged` Security Context Constraint is required. Grant the `ansible-builder-shipwright` ServiceAccount previously created access to the SCC by creating a _RoleBinding_ by executing the following command:
+
+```
+kubectl apply -f resources/privileged-scc-rolebinding.yml
+```
+
+7. In order for the `ansible-builder-shipwright` _ServiceAccount_ to be able to push to OpenShift's internal registry, execute the following command to create a new _Rolebinding_ called `ansible-builder-shipwright-image-pusher`:
+
+```
+kubectl apply -f resources/edit-rolebinding.yml
+```
+
+8. Start a new Build by creating a `BuildRun`
 
 ```
 kubectl create -f example/ansible-builder-buildrun.yml
 ```
 
-4. Monitor the progress of the BuildRun
+9. Monitor the progress of the BuildRun
 
 You can monitor the progress of the build which is executed using a Tekton `TaskRun` if you have the Tekton CLI (`tkn`) installed on your machine
 
@@ -82,12 +107,12 @@ tkn taskrun logs -f -L
 
 The above command will display the logs for the most recent TaskRun
 
-Once the build is complete, an image will be published to OpenShift's internal image registry. Alternatively, the produced image can also be stored in an external registry, such as quay.io by modifying the `ansible-builder-example` Build resource and modifying the `output.image` field. Credentials to authenticate with the external registry will most likely need to be provided. Consult the Shipwright documentation with the steps needed to configure.
+Once the build is complete, an image will be published to OpenShift's internal image registry. Alternatively, the produced image can also be stored in an external registry, such as quay.io by modifying the `ansible-builder-example` Build resource and modifying the `output.image` field.
 
-5. Verify the newly created Ansible Execution Environment
+10. Verify the newly created Ansible Execution Environment
 
 Confirm the functionality of the newly created Execution Environment by starting a pod that will list all pods within this namespace using the [k8s_info](https://docs.ansible.com/ansible/latest/collections/community/kubernetes/k8s_info_module.html) module from the [community.kubernetes collection](https://galaxy.ansible.com/community/kubernetes), execute the following command:
 
 ```
-kubectl run -it ansible-builder-shipwright-example-ee --image=image-registry.openshift-image-registry.svc:5000/ansible-builder-shipwright/ansible-builder-shipwright-example-ee:latest --serviceaccount=pipeline --rm --restart=Never -- ansible-runner run --hosts localhost -m community.kubernetes.k8s_info -a "api_key={{ lookup('file', '/var/run/secrets/kubernetes.io/serviceaccount/token') }} ca_cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt host=https://kubernetes.default.svc kind=Pod  namespace=ansible-builder-shipwright validate_certs=yes" /tmp/ansible-runner
+kubectl run -it ansible-builder-shipwright-example-ee --image=image-registry.openshift-image-registry.svc:5000/ansible-builder-shipwright/ansible-builder-shipwright-example-ee:latest --serviceaccount=ansible-builder-shipwright --rm --restart=Never -- ansible-runner run --hosts localhost -m community.kubernetes.k8s_info -a "api_key={{ lookup('file', '/var/run/secrets/kubernetes.io/serviceaccount/token') }} ca_cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt host=https://kubernetes.default.svc kind=Pod  namespace=ansible-builder-shipwright validate_certs=yes" /tmp/ansible-runner
 ```

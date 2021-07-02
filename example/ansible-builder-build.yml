@@ -6,7 +6,7 @@ spec:
   source:
     url: https://github.com/sabre1041/ansible-builder-shipwright
     contextDir: example-builder
-    revision: main
+    revision: aap
   output:
     image: image-registry.openshift-image-registry.svc:5000/ansible-builder-shipwright/ansible-builder-shipwright-example-ee:latest
   strategy:
