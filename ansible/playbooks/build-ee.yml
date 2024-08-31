@@ -5,7 +5,7 @@
   tasks:
     - name: Create Shipwright Build
       kubernetes.core.k8s:
-        name: "ansible-builder-example-{{ lookup('community.general.random_string', length=5, numbers=false, upper=false, special=false) }}"
+        # name: "ansible-builder-example-{{ lookup('community.general.random_string', length=5, numbers=false, upper=false, special=false) }}"
         namespace: "{{ ansible_builder_shipwright_namespace }}"
         definition: "{{ lookup('file', playbook_dir + '/../../example/ansible-builder-buildrun.yml') }}"
       register: shipwright_build
@@ -14,7 +14,7 @@
       kubernetes.core.k8s_info:
         name: "{{ shipwright_build.result.metadata.name }}"
         namespace: "{{ ansible_builder_shipwright_namespace }}"
-        api_version: shipwright.io/v1alpha1
+        api_version: shipwright.io/v1beta1
         kind: BuildRun
       register: shipwright_build_status
       failed_when:
@@ -33,5 +33,5 @@
       delay: 30 # 30 seconds
 
     - name: Print EE Image Location
-      debug:
+      ansible.builtin.debug:
         msg: "EE is available at '{{ shipwright_build_status.resources[0].status.buildSpec.output.image }}'"

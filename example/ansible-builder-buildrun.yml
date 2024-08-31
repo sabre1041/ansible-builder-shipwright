@@ -1,9 +1,8 @@
-apiVersion: shipwright.io/v1alpha1
+apiVersion: shipwright.io/v1beta1
 kind: BuildRun
 metadata:
   generateName: ansible-builder-example-
 spec:
-  buildRef:
+  build:
     name: ansible-builder-example
-  serviceAccount:
-    name: ansible-builder-shipwright
+  serviceAccount: ansible-builder-shipwright

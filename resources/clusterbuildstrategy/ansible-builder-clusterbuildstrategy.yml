@@ -1,29 +1,28 @@
-apiVersion: shipwright.io/v1alpha1
+apiVersion: shipwright.io/v1beta1
 kind: ClusterBuildStrategy
 metadata:
   name: ansible-builder
+  annotations:
+    io.kubernetes.cri-o.Devices: "/dev/fuse"
 spec:
-  buildSteps:
+  steps:
     - args:
+        - /bin/bash
         - -c
         - |
           set -e
 
-          # rootless container support (Disabled until anyuid can be removed)
-          #echo "ansible-builder:x:$(id -u):0:ansible-builder user:${HOME}:/sbin/nologin" >> /etc/passwd
-          #echo $(id -u):1100000000:65536 >> /etc/subuid
-          #echo $(id -u):1100000000:65536 >> /etc/subgid
-
           # Change into directory containing EE
-          cd /workspace/source/$(build.source.contextDir)
+          cd $(params.shp-source-context)
 
           # Create Ansible Build Context
           /usr/bin/ansible-builder create -c $HOME/context
 
           # Build the EE
-          /usr/bin/buildah --storage-driver=vfs build -t $(build.output.image) $HOME/context
-      command:
-        - /bin/bash
+          /usr/bin/buildah build -t $(params.shp-output-image) $HOME/context
+
+          # Push the EE
+          /usr/bin/buildah push --tls-verify=false $(params.shp-output-image)
       image: "quay.io/ablock/ansible-builder-nested:latest"
       name: ansible-builder-build
       resources:
@@ -33,26 +32,9 @@ spec:
         requests:
           cpu: 500m
           memory: 512Mi
-      volumeMounts:
-        - mountPath: /home/builder/.local/share/containers/storage
-          name: ansible-builder-images
+      securityContext:
+        capabilities:
+          add:
+          - "SETUID"
+          - "SETGID"
       workingDir: /workspace/source
-    - args:
-        - --storage-driver=vfs
-        - push
-        - "--tls-verify=false"
-        - $(build.output.image)
-      command:
-        - /usr/bin/buildah
-      image: "quay.io/ablock/ansible-builder-nested:latest"
-      name: ansible-builder-push
-      resources:
-        limits:
-          cpu: 500m
-          memory: 1Gi
-        requests:
-          cpu: 250m
-          memory: 256Mi
-      volumeMounts:
-        - mountPath: /home/builder/.local/share/containers/storage
-          name: ansible-builder-images
